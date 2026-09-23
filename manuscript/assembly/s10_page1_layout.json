@@ -1,0 +1,20 @@
+{
+  "rows": [
+    {
+      "panels": [
+        {"file": "../figures/real/S10/S10_a_umap.pdf"},
+        {"file": "../figures/real/S10/S10_b_doe_heatmap.pdf"}
+      ]
+    },
+    {
+      "panels": [
+        {"file": "../figures/real/S10/S10_c_branch_umap_pseudotime.pdf"}
+      ]
+    },
+    {
+      "panels": [
+        {"file": "../figures/real/S10/S10_d_module_trends.pdf"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "rows": [
+    {
+      "row_height": 540,
+      "panels": [
+        {"file": "plots/00_metric_heatmap.pdf"}
+      ]
+    },
+    {
+      "row_height": 410,
+      "panels": [
+        {"file": "plots/00_branched_metric_heatmap.pdf"}
+      ]
+    }
+  ]
+}

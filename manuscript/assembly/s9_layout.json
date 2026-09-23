@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "row_height": 187,
+      "panels": [
+        {"file": "../figures/real/S9/S9_a_umap.pdf"},
+        {"file": "../figures/real/S9/S9_b_module_trends.pdf"}
+      ]
+    },
+    {
+      "row_height": 319,
+      "panels": [
+        {"file": "../figures/real/S9/S9_c_doe_heatmap.pdf"},
+        {"file": "../figures/real/S9/S9_d_gam_tf_trends.pdf"}
+      ]
+    },
+    {
+      "row_height": 334,
+      "panels": [
+        {"file": "../figures/real/S9/S9_e_violin_celltype.pdf"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "rows": [
+    {
+      "panels": [
+        {"file": "../figures/real/S10/S10_e_gam_stem_to_ery.pdf", "label": "E"},
+        {"file": "../figures/real/S10/S10_e_gam_stem_to_b.pdf", "label": "F"}
+      ]
+    },
+    {
+      "panels": [
+        {"file": "../figures/real/S10/S10_f_violin_stem_to_ery.pdf", "label": "G"},
+        {"file": "../figures/real/S10/S10_f_violin_stem_to_b.pdf", "label": "H"}
+      ]
+    }
+  ]
+}
