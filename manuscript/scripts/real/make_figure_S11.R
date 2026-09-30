@@ -23,6 +23,9 @@
 # Prerequisites:
 #   data/cd8t.rds
 #
+# Marker genes: SlimR::Markers_list_PCTIT "CD8+ Tn" (early) / "CD8+ GZMK+ Tex"
+# (terminal), top_n = NULL (no truncation).
+#
 # Usage:
 #   Rscript manuscript/scripts/real/make_figure_S11.R
 # =============================================================================
@@ -58,14 +61,15 @@ hvg    <- VariableFeatures(seurat)
 expr_mat      <- as.matrix(GetAssayData(seurat, layer = "data")[hvg, ])
 fullgene_expr <- as.matrix(GetAssayData(seurat, layer = "data"))
 
-message("Fetching MSigDB markers (same as S8) ...")
-ms <- get_markers_msigdb(
-  early      = "KAECH_NAIVE_VS_DAY8_EFF_CD8_TCELL_UP",
-  terminal   = "JIANG_MELANOMA_TRM2_CD8",
-  collection = NULL,
-  species    = "Homo sapiens"
+message("Fetching SlimR PCTIT markers for S11 ...")
+pctit_s11 <- SlimR::Markers_list_PCTIT
+ms <- BioTrajX:::.marker_set(
+  early    = pctit_s11[["CD8+ Tn"]]$Markers,
+  terminal = pctit_s11[["CD8+ GZMK+ Tex"]]$Markers,
+  source   = "SlimR_PCTIT",
+  metadata = list(early_set = "CD8+ Tn", terminal_set = "CD8+ GZMK+ Tex")
 )
-ms           <- filter_markers(ms, seurat, top_n = 30, min_detection = 0.10)
+ms <- filter_markers(ms, seurat, top_n = NULL, min_detection = 0.10)
 naive_genes  <- ms$early
 tex_genes    <- ms$terminal
 message(sprintf("  Markers: %d naive, %d exhausted", length(naive_genes), length(tex_genes)))

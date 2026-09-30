@@ -237,13 +237,17 @@ tryCatch({
 
   shared_s10 <- intersect(rownames(umap_df_s10), rownames(ti_df_s10))
 
-  # Root cell: identical across all methods — the single most-primitive cell
-  # by CytoTRACE score (see run_ti_stemcell.R), passed as start_cell to every
-  # TI method. The "CytoTRACE" column of ti_df_s10 *is* that same raw score
-  # (run_all_ti_methods() dispatches it straight to run_cytotrace()), so the
-  # root cell can be read off it directly rather than recomputed.
-  root_cell_s10 <- if ("CytoTRACE" %in% colnames(ti_df_s10))
-    shared_s10[which.min(ti_df_s10[shared_s10, "CytoTRACE"])] else NA_character_
+  # Root cell: identical across all methods — the Stem_Progenitors centroid
+  # cell (see run_ti_stemcell.R), passed as start_cell to every TI method.
+  # Persisted to root_cell_stemcell.txt since it can no longer be read off
+  # any one method's pseudotime column (unlike CytoTRACE, it isn't a raw
+  # score).
+  root_cell_path_s10 <- file.path(repo_root, "manuscript", "results", "branch_stemcell",
+                                  "root_cell_stemcell.txt")
+  root_cell_s10 <- if (file.exists(root_cell_path_s10))
+    readLines(root_cell_path_s10, n = 1) else NA_character_
+  root_cell_s10 <- if (!is.na(root_cell_s10) && root_cell_s10 %in% shared_s10)
+    root_cell_s10 else NA_character_
   root_coord_s10 <- if (!is.na(root_cell_s10))
     umap_df_s10[root_cell_s10, c("UMAP1", "UMAP2")] else NULL
 
@@ -332,13 +336,44 @@ tryCatch({
 }, error = function(e) message("  SKIPPED S10-c: ", e$message))
 
 # ── Panel b: BioTrajX DOE heatmap (branch scope + overall DOE column) ─────────
+# Style/font size matching S8 panel c.
 message("\n[S10-b] DOE heatmap (BioTrajX, branch scope)")
 tryCatch({
   if (is.null(res_s10)) stop("res_s10 is NULL")
+  if (requireNamespace("showtext", quietly = TRUE) && requireNamespace("sysfonts", quietly = TRUE)) {
+    sysfonts::font_add("Arial",
+      regular    = file.path(repo_root, "manuscript", "fonts", "Arial.ttf"),
+      bold       = file.path(repo_root, "manuscript", "fonts", "Arial Bold.ttf"),
+      italic     = file.path(repo_root, "manuscript", "fonts", "Arial Italic.ttf"),
+      bolditalic = file.path(repo_root, "manuscript", "fonts", "Arial Bold Italic.ttf"))
+    showtext::showtext_auto()
+    showtext::showtext_opts(dpi = 300)
+  }
   p_b10 <- plot(res_s10, scope = "branch", type = "heatmap", branch_mode = "facet") +
     labs(title = NULL) +
-    theme(panel.grid = element_blank())
-  ggsave(file.path(out_S10, "S10_b_doe_heatmap.pdf"), p_b10, width = 11, height = 7)
+    theme(panel.grid = element_blank(),
+          text         = element_text(family = "Arial"),
+          axis.text    = element_text(size = 15, family = "Arial"),
+          axis.title   = element_text(size = 16, family = "Arial"),
+          legend.text  = element_text(size = 14, family = "Arial"),
+          legend.title = element_text(size = 15, family = "Arial"),
+          strip.text   = element_text(size = 15, family = "Arial", face = "bold"))
+  p_b10$layers[[2]]$aes_params$size <- 5.1
+  p_b10$layers[[2]]$aes_params$family <- "Arial"
+  # facet_wrap gives every panel equal width by default, but the two branch
+  # facets each carry 6 metric columns while "Overall" carries just 1 --
+  # size panels proportionally to their column count (branches wider,
+  # Overall a thin single-column strip) instead of an even three-way split.
+  if (requireNamespace("ggh4x", quietly = TRUE)) {
+    branch_panel_order <- levels(ggplot2::ggplot_build(p_b10)$layout$layout$branch)
+    # 2 (not 1) for "Overall" -- a single-column panel narrow enough to read
+    # as thin next to the 6-column branches, but wide enough for its strip
+    # title ("Overall", bold 15pt) not to clip.
+    panel_widths <- ifelse(branch_panel_order == "Overall", 2, 6)
+    p_b10 <- p_b10 + ggh4x::force_panelsizes(cols = grid::unit(panel_widths, "null"))
+  }
+  ggsave(file.path(out_S10, "S10_b_doe_heatmap.pdf"), p_b10, width = 11.5, height = 7.5, dpi = 300)
+  if (requireNamespace("showtext", quietly = TRUE)) showtext::showtext_auto(FALSE)
   message("  Saved S10_b_doe_heatmap.pdf")
 }, error = function(e) message("  SKIPPED S10-b: ", e$message))
 

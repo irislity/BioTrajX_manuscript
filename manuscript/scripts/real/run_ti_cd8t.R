@@ -3,8 +3,14 @@
 #
 # Run all TI methods on the CD8 T-cell dataset and save pseudotimes.
 #
+# Root cell (start_cell passed to the 7 directed methods): the CD8.NaiveLike
+# cell nearest the naive-population centroid in PCA space -- a stable,
+# method-agnostic root not tied to any one TI method's own noise (same
+# approach as GSE131847's d0centroid root; see run_ti_gse131847.R).
+#
 # INPUT:   data/cd8t.rds
 # OUTPUT:  manuscript/results/linear_cd8t/ti_pseudotime_cd8t.csv
+#          manuscript/results/linear_cd8t/root_cell_cd8t.txt
 #
 # Usage:
 #   Rscript manuscript/scripts/real/run_ti_cd8t.R
@@ -43,13 +49,20 @@ message(sprintf("  log-norm HVG:  %d × %d", nrow(expr),          ncol(expr)))
 message(sprintf("  log-norm (all):%d × %d", nrow(fullgene_expr), ncol(fullgene_expr)))
 
 # =============================================================================
-# 3. ROOT CELL — most primitive cell by CytoTRACE score
+# 3. ROOT CELL — naive-population centroid
 # =============================================================================
-message("Computing CytoTRACE score for root cell selection ...")
-cytotrace_pt <- run_cytotrace(expr, fullgene_expr)
-# run_cytotrace() inverts: 0 = primitive, 1 = differentiated — so root = min
-start_cell   <- names(which.min(cytotrace_pt))
-message(sprintf("  Root cell: %s", start_cell))
+# Naive cell closest to the CD8.NaiveLike centroid in PCA space -- a stable,
+# method-agnostic root not tied to any one TI method's own noise (same
+# approach as GSE131847's d0centroid root; see run_ti_gse131847.R).
+message("Computing CD8.NaiveLike centroid for root cell selection ...")
+naive_cells <- colnames(seurat)[seurat$functional.cluster == "CD8.NaiveLike"]
+n_pcs_root  <- min(20, ncol(seurat_pca))
+naive_pca   <- seurat_pca[naive_cells, seq_len(n_pcs_root), drop = FALSE]
+centroid    <- colMeans(naive_pca)
+d_centroid  <- sqrt(rowSums(sweep(naive_pca, 2, centroid, "-")^2))
+start_cell  <- naive_cells[which.min(d_centroid)]
+message(sprintf("  Root cell (nearest CD8.NaiveLike centroid in PC1-%d): %s",
+                n_pcs_root, start_cell))
 
 # =============================================================================
 # 4. RUN TI METHODS
@@ -73,4 +86,8 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 out <- file.path(out_dir, "ti_pseudotime_cd8t.csv")
 write.csv(ti_results, out, row.names = TRUE)
 message("\nSaved: ", out)
+
+root_out <- file.path(out_dir, "root_cell_cd8t.txt")
+writeLines(start_cell, root_out)
+message("Saved: ", root_out)
 message("Done.")
