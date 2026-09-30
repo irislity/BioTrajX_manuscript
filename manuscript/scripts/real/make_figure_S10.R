@@ -360,6 +360,18 @@ tryCatch({
           strip.text   = element_text(size = 15, family = "Arial", face = "bold"))
   p_b10$layers[[2]]$aes_params$size <- 5.1
   p_b10$layers[[2]]$aes_params$family <- "Arial"
+  # facet_wrap gives every panel equal width by default, but the two branch
+  # facets each carry 6 metric columns while "Overall" carries just 1 --
+  # size panels proportionally to their column count (branches wider,
+  # Overall a thin single-column strip) instead of an even three-way split.
+  if (requireNamespace("ggh4x", quietly = TRUE)) {
+    branch_panel_order <- levels(ggplot2::ggplot_build(p_b10)$layout$layout$branch)
+    # 2 (not 1) for "Overall" -- a single-column panel narrow enough to read
+    # as thin next to the 6-column branches, but wide enough for its strip
+    # title ("Overall", bold 15pt) not to clip.
+    panel_widths <- ifelse(branch_panel_order == "Overall", 2, 6)
+    p_b10 <- p_b10 + ggh4x::force_panelsizes(cols = grid::unit(panel_widths, "null"))
+  }
   ggsave(file.path(out_S10, "S10_b_doe_heatmap.pdf"), p_b10, width = 11.5, height = 7.5, dpi = 300)
   if (requireNamespace("showtext", quietly = TRUE)) showtext::showtext_auto(FALSE)
   message("  Saved S10_b_doe_heatmap.pdf")
