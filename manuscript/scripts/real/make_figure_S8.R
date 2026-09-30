@@ -58,12 +58,15 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
 
 # NCR = Naive_Centroid_Root, CR = CytoTRACE_Root -- the two roots compared.
-# Shared colours so panel a's root markers and legend stay in sync.
-NCR_LABEL <- "NCR (Naive_Centroid_Root)"
-CR_LABEL  <- "CR (CytoTRACE_Root)"
-NCR_COLOR <- "blue"
-CR_COLOR  <- "red"
-ROOT_DIRS <- c(NCR = "linear_gse131847_d0centroid", CR = "linear_gse131847_cytoglobal")
+# Shared colours/labels so panel a's root markers and panel d's shape legend
+# stay in sync. CytoTRACE itself is root-independent (run_cytotrace() never
+# receives start_cell), so it gets its own label/shape rather than either.
+NCR_LABEL  <- "NCR (Naive_Centroid_Root)"
+CR_LABEL   <- "CR (CytoTRACE_Root)"
+CYTO_LABEL <- "CytoTRACE (root-independent)"
+NCR_COLOR  <- "blue"
+CR_COLOR   <- "red"
+ROOT_DIRS  <- c(NCR = "linear_gse131847_d0centroid", CR = "linear_gse131847_cytoglobal")
 
 BASE_A <- 11.63; HEAD_A <- 12.64; SUB_A <- 10.11
 
@@ -406,6 +409,14 @@ tryCatch({
   }))
   day_corr <- day_corr[order(-day_corr$DOE_score), ]
 
+  # Root type per method, for panel d's shape legend (explains what NCR/CR
+  # mean directly in the plot rather than relying on the facet titles alone).
+  day_corr$RootType <- ifelse(grepl("_NCR$", day_corr$Method), NCR_LABEL,
+                        ifelse(grepl("_CR$",  day_corr$Method), CR_LABEL,
+                               CYTO_LABEL))
+  day_corr$RootType <- factor(day_corr$RootType,
+                              levels = c(NCR_LABEL, CR_LABEL, CYTO_LABEL))
+
   message("\nPer-method: pseudotime vs. true day-of-infection correlation, and DOE score")
   print(day_corr[, c("Method", "DOE_score", "spearman_rho", "spearman_p")])
 
@@ -442,14 +453,17 @@ tryCatch({
       showtext::showtext_opts(dpi = 300)
     }
 
+    root_shape_values <- setNames(c(17, 16, 18), c(NCR_LABEL, CR_LABEL, CYTO_LABEL))
+
     p_d <- ggplot(day_corr, aes(x = DOE_score, y = spearman_rho)) +
       geom_smooth(method = "lm", se = TRUE, colour = "#AAAAAA",
                  fill = "#DDDDDD", linewidth = 0.8) +
-      geom_point(aes(colour = DOE_score), size = 5) +
+      geom_point(aes(colour = DOE_score, shape = RootType), size = 5) +
       geom_text_repel(aes(label = Method), size = 4.3, max.overlaps = 20,
                       box.padding = 0.5, point.padding = 0.3, force = 3,
                       family = "Arial") +
       scale_colour_viridis_c(name = "DOE score", option = "plasma", direction = -1) +
+      scale_shape_manual(name = "Root", values = root_shape_values) +
       annotate("text", x = ann_x, y = max(day_corr$spearman_rho) * 0.98,
                size = 5, colour = "grey30", family = "Arial",
                label = sprintf("r = %.2f (%s)",
