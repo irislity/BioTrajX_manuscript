@@ -23,15 +23,11 @@
 # Prerequisites:
 #   data/cd8t.rds
 #
+# Marker genes: SlimR::Markers_list_PCTIT "CD8+ Tn" (early) / "CD8+ GZMK+ Tex"
+# (terminal), top_n = NULL (no truncation).
+#
 # Usage:
-#   Rscript manuscript/scripts/real/make_figure_S11.R [marker_mode]
-#     marker_mode  msigdb (default) | slimr_pctit
-#                  -- msigdb: KAECH_NAIVE_VS_DAY8_EFF_CD8_TCELL_UP (early) /
-#                     JIANG_MELANOMA_TRM2_CD8 (terminal), top_n = 30
-#                  -- slimr_pctit: SlimR::Markers_list_PCTIT "CD8+ Tn" (early) /
-#                     "CD8+ GZMK+ Tex" (terminal), top_n = NULL (no truncation)
-#                  Output goes to figures/real/S11 (msigdb) or
-#                  figures/real/S11_slimr_pctit.
+#   Rscript manuscript/scripts/real/make_figure_S11.R
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -48,13 +44,7 @@ source(file.path(repo_root, "manuscript", "scripts", "real", "run_ti_methods.R")
 has_patchwork <- requireNamespace("patchwork", quietly = TRUE)
 if (has_patchwork) library(patchwork)
 
-args        <- commandArgs(trailingOnly = TRUE)
-marker_mode <- if (length(args) >= 1) args[1] else "msigdb"
-stopifnot(marker_mode %in% c("msigdb", "slimr_pctit"))
-message("marker_mode = ", marker_mode)
-
-out_S11 <- file.path(repo_root, "manuscript", "figures", "real",
-                     if (marker_mode == "msigdb") "S11" else paste0("S11_", marker_mode))
+out_S11 <- file.path(repo_root, "manuscript", "figures", "real", "S11")
 dir.create(out_S11, recursive = TRUE, showWarnings = FALSE)
 
 # =============================================================================
@@ -71,26 +61,15 @@ hvg    <- VariableFeatures(seurat)
 expr_mat      <- as.matrix(GetAssayData(seurat, layer = "data")[hvg, ])
 fullgene_expr <- as.matrix(GetAssayData(seurat, layer = "data"))
 
-if (marker_mode == "msigdb") {
-  message("Fetching MSigDB markers (same as S8) ...")
-  ms <- get_markers_msigdb(
-    early      = "KAECH_NAIVE_VS_DAY8_EFF_CD8_TCELL_UP",
-    terminal   = "JIANG_MELANOMA_TRM2_CD8",
-    collection = NULL,
-    species    = "Homo sapiens"
-  )
-  ms <- filter_markers(ms, seurat, top_n = 30, min_detection = 0.10)
-} else {
-  message("Fetching SlimR PCTIT markers for S11 ...")
-  pctit_s11 <- SlimR::Markers_list_PCTIT
-  ms <- BioTrajX:::.marker_set(
-    early    = pctit_s11[["CD8+ Tn"]]$Markers,
-    terminal = pctit_s11[["CD8+ GZMK+ Tex"]]$Markers,
-    source   = "SlimR_PCTIT",
-    metadata = list(early_set = "CD8+ Tn", terminal_set = "CD8+ GZMK+ Tex")
-  )
-  ms <- filter_markers(ms, seurat, top_n = NULL, min_detection = 0.10)
-}
+message("Fetching SlimR PCTIT markers for S11 ...")
+pctit_s11 <- SlimR::Markers_list_PCTIT
+ms <- BioTrajX:::.marker_set(
+  early    = pctit_s11[["CD8+ Tn"]]$Markers,
+  terminal = pctit_s11[["CD8+ GZMK+ Tex"]]$Markers,
+  source   = "SlimR_PCTIT",
+  metadata = list(early_set = "CD8+ Tn", terminal_set = "CD8+ GZMK+ Tex")
+)
+ms <- filter_markers(ms, seurat, top_n = NULL, min_detection = 0.10)
 naive_genes  <- ms$early
 tex_genes    <- ms$terminal
 message(sprintf("  Markers: %d naive, %d exhausted", length(naive_genes), length(tex_genes)))
