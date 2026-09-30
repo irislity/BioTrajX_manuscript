@@ -237,13 +237,17 @@ tryCatch({
 
   shared_s10 <- intersect(rownames(umap_df_s10), rownames(ti_df_s10))
 
-  # Root cell: identical across all methods — the single most-primitive cell
-  # by CytoTRACE score (see run_ti_stemcell.R), passed as start_cell to every
-  # TI method. The "CytoTRACE" column of ti_df_s10 *is* that same raw score
-  # (run_all_ti_methods() dispatches it straight to run_cytotrace()), so the
-  # root cell can be read off it directly rather than recomputed.
-  root_cell_s10 <- if ("CytoTRACE" %in% colnames(ti_df_s10))
-    shared_s10[which.min(ti_df_s10[shared_s10, "CytoTRACE"])] else NA_character_
+  # Root cell: identical across all methods — the Stem_Progenitors centroid
+  # cell (see run_ti_stemcell.R), passed as start_cell to every TI method.
+  # Persisted to root_cell_stemcell.txt since it can no longer be read off
+  # any one method's pseudotime column (unlike CytoTRACE, it isn't a raw
+  # score).
+  root_cell_path_s10 <- file.path(repo_root, "manuscript", "results", "branch_stemcell",
+                                  "root_cell_stemcell.txt")
+  root_cell_s10 <- if (file.exists(root_cell_path_s10))
+    readLines(root_cell_path_s10, n = 1) else NA_character_
+  root_cell_s10 <- if (!is.na(root_cell_s10) && root_cell_s10 %in% shared_s10)
+    root_cell_s10 else NA_character_
   root_coord_s10 <- if (!is.na(root_cell_s10))
     umap_df_s10[root_cell_s10, c("UMAP1", "UMAP2")] else NULL
 

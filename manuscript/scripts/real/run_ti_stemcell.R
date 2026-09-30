@@ -3,8 +3,14 @@
 #
 # Run all TI methods on the stem cell dataset and save pseudotimes.
 #
+# Root cell (start_cell passed to the 7 directed methods): the
+# Stem_Progenitors cell nearest the stem-cell-population centroid in PCA
+# space -- a stable, method-agnostic root not tied to any one TI method's own
+# noise (same approach as GSE131847's d0centroid root; see run_ti_gse131847.R).
+#
 # INPUT:   data/stem_cell.rds
 # OUTPUT:  manuscript/results/branch_stemcell/ti_pseudotimes.csv
+#          manuscript/results/branch_stemcell/root_cell_stemcell.txt
 #
 # Usage:
 #   Rscript manuscript/scripts/real/run_ti_stemcell.R
@@ -46,13 +52,20 @@ message(sprintf("  log-norm HVG:  %d × %d", nrow(expr),          ncol(expr)))
 message(sprintf("  log-norm (all):%d × %d", nrow(fullgene_expr), ncol(fullgene_expr)))
 
 # =============================================================================
-# 3. ROOT CELL — most primitive cell by CytoTRACE score
+# 3. ROOT CELL — stem-cell-population centroid
 # =============================================================================
-message("Computing CytoTRACE score for root cell selection ...")
-cytotrace_pt <- run_cytotrace(expr, fullgene_expr)
-# run_cytotrace() inverts: 0 = primitive, 1 = differentiated — so root = min
-start_cell   <- names(which.min(cytotrace_pt))
-message(sprintf("  Root cell: %s", start_cell))
+# Cell closest to the Stem_Progenitors centroid in PCA space -- a stable,
+# method-agnostic root not tied to any one TI method's own noise (same
+# approach as GSE131847's d0centroid root; see run_ti_gse131847.R).
+message("Computing Stem_Progenitors centroid for root cell selection ...")
+stem_cells  <- colnames(seurat)[seurat$Phenotype == "Stem_Progenitors"]
+n_pcs_root  <- min(20, ncol(seurat_pca))
+stem_pca    <- seurat_pca[stem_cells, seq_len(n_pcs_root), drop = FALSE]
+centroid    <- colMeans(stem_pca)
+d_centroid  <- sqrt(rowSums(sweep(stem_pca, 2, centroid, "-")^2))
+start_cell  <- stem_cells[which.min(d_centroid)]
+message(sprintf("  Root cell (nearest Stem_Progenitors centroid in PC1-%d): %s",
+                n_pcs_root, start_cell))
 
 # =============================================================================
 # 4. RUN ALL TI METHODS
@@ -74,4 +87,8 @@ ti_results <- run_all_ti_methods(
 out <- file.path(out_dir, "ti_pseudotimes.csv")
 write.csv(ti_results, out, row.names = TRUE)
 message("Saved: ", out)
+
+root_out <- file.path(out_dir, "root_cell_stemcell.txt")
+writeLines(start_cell, root_out)
+message("Saved: ", root_out)
 message("Done.")

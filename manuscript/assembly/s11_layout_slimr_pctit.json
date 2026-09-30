@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "row_height": 438,
+      "panels": [
+        {
+          "file": "../figures/real/S11_slimr_pctit/S11_a_umap.pdf"
+        }
+      ]
+    },
+    {
+      "row_height": 269,
+      "panels": [
+        {
+          "file": "../figures/real/S11_slimr_pctit/S11_b_gene_trends.pdf"
+        },
+        {
+          "file": "../figures/real/S11_slimr_pctit/S11_c_doe_bar.pdf"
+        }
+      ]
+    },
+    {
+      "row_height": 193,
+      "panels": [
+        {
+          "file": "../figures/real/S11_slimr_pctit/S11_d_radar.pdf"
+        },
+        {
+          "file": "../figures/real/S11_slimr_pctit/S11_e_doe_heatmap.pdf"
+        }
+      ]
+    }
+  ]
+}

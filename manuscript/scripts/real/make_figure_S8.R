@@ -19,10 +19,50 @@
 #
 # Prerequisites:
 #   data/GSE131847_seu.rds
-#   manuscript/results/linear_gse131847/ti_pseudotime_gse131847.csv  (from run_ti_gse131847.R)
+#   manuscript/results/linear_gse131847_<root_mode>/ti_pseudotime_gse131847.csv (from run_ti_gse131847.R)
+#   manuscript/results/linear_gse131847_<root_mode>/root_cell_gse131847.txt     (from run_ti_gse131847.R)
 #
 # Usage:
-#   Rscript manuscript/scripts/real/make_figure_S8.R
+#   Rscript manuscript/scripts/real/make_figure_S8.R [root_mode] [cyto_marker] [version_tag]
+#     root_mode    d0centroid (default) | cytonaive | cytoglobal | dualcyto | ncr_cr | ncr_cr_nrcr
+#                  -- which run_ti_gse131847.R results dir to read (selects
+#                     the start_cell used for the 7 directed methods).
+#                     dualcyto reads 15 trajectory columns (7 directed
+#                     methods x 2 roots, suffixed "_cytonaive"/"_cytoglobal",
+#                     + 1 root-independent CytoTRACE column) and marks each
+#                     panel with the root actually used for it -- cyto_marker
+#                     is ignored in this mode.
+#                     ncr_cr is the same dual-root structure as dualcyto, but
+#                     pairs NCR (Naive_Centroid_Root, from the already-computed
+#                     linear_gse131847_d0centroid results) with CR
+#                     (CytoTRACE_Root, i.e. cytoglobal) instead of
+#                     cytonaive/cytoglobal -- suffixes are "_NCR"/"_CR", no
+#                     TI methods are rerun (both halves are read straight off
+#                     existing results dirs), and cyto_marker is ignored.
+#                     ncr_cr_nrcr extends ncr_cr with a third root, NRCR
+#                     (Naive_Restricted_CytoTRACE_Root, i.e. cytonaive --
+#                     lowest CytoTRACE score among naive cells only): 7
+#                     directed methods x 3 roots + 1 root-independent
+#                     CytoTRACE column = 22 trajectory columns, suffixed
+#                     "_NCR"/"_CR"/"_NRCR". All three halves are read straight
+#                     off existing results dirs -- no TI methods are rerun --
+#                     and cyto_marker is ignored.
+#     cyto_marker  global_cyto_min (default) | naive_cyto_min | same_as_start_cell
+#                  -- which cell to draw as the root marker on the CytoTRACE
+#                     panel specifically (CytoTRACE is unsupervised and never
+#                     receives start_cell, so its "root" is a separate choice):
+#                       global_cyto_min     cell with the lowest CytoTRACE
+#                                           score genome-wide (CytoTRACE's own
+#                                           unrestricted pick)
+#                       naive_cyto_min      cell with the lowest CytoTRACE
+#                                           score among naive cells only
+#                       same_as_start_cell  the same start_cell used for the
+#                                           other 7 methods (matches the
+#                                           original script's behaviour, where
+#                                           a single shared root was marked on
+#                                           every panel)
+#     version_tag  label used for the output figures dir: S8_<version_tag>
+#                  (default: root_mode)
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -40,9 +80,28 @@ library(BioTrajX)
 has_patchwork <- requireNamespace("patchwork", quietly = TRUE)
 if (has_patchwork) library(patchwork)
 
-out_dir     <- file.path(repo_root, "manuscript", "figures", "real", "S8")
-results_dir <- file.path(repo_root, "manuscript", "results", "linear_gse131847")
+args        <- commandArgs(trailingOnly = TRUE)
+root_mode   <- if (length(args) >= 1) args[1] else "d0centroid"
+cyto_marker <- if (length(args) >= 2) args[2] else "global_cyto_min"
+version_tag <- if (length(args) >= 3) args[3] else root_mode
+stopifnot(root_mode %in% c("d0centroid", "cytonaive", "cytoglobal", "dualcyto", "ncr_cr", "ncr_cr_nrcr"))
+stopifnot(cyto_marker %in% c("global_cyto_min", "naive_cyto_min", "same_as_start_cell"))
+message("root_mode = ", root_mode, " | cyto_marker = ", cyto_marker, " | version_tag = ", version_tag)
+
+out_dir     <- file.path(repo_root, "manuscript", "figures", "real", paste0("S8_", version_tag))
+results_dir <- file.path(repo_root, "manuscript", "results", paste0("linear_gse131847_", root_mode))
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
+
+# NCR = Naive_Centroid_Root, CR = CytoTRACE_Root, NRCR = Naive_Restricted_
+# CytoTRACE_Root -- the roots compared in ncr_cr / ncr_cr_nrcr modes. Shared
+# colours so panel a's root markers and legend stay in sync.
+NCR_LABEL  <- "NCR (Naive_Centroid_Root)"
+CR_LABEL   <- "CR (CytoTRACE_Root)"
+NRCR_LABEL <- "NRCR (Naive_Restricted_CytoTRACE_Root)"
+NCR_COLOR  <- "blue"
+CR_COLOR   <- "red"
+NRCR_COLOR <- "green"
 
 BASE_A <- 11.63; HEAD_A <- 12.64; SUB_A <- 10.11
 
@@ -102,14 +161,72 @@ message("Loading GSE131847_seu.rds ...")
 obj <- readRDS(file.path(repo_root, "data", "GSE131847_seu.rds"))
 DefaultAssay(obj) <- "SCT"
 
-csv_path <- file.path(results_dir, "ti_pseudotime_gse131847.csv")
-if (!file.exists(csv_path))
-  stop("ti_pseudotime_gse131847.csv not found. Run run_ti_gse131847.R first.")
-ti_df <- read.csv(csv_path, row.names = 1, check.names = FALSE)
-
 ti_methods_8 <- c("PAGA-DPT", "CytoTRACE", "Monocle3", "DPT", "Slingshot", "SCORPIUS",
                   "TSCAN", "Palantir")
-ti_df <- ti_df[, colnames(ti_df) %in% ti_methods_8, drop = FALSE]
+directed_8   <- setdiff(ti_methods_8, "CytoTRACE")
+
+# Multi-root modes (ncr_cr, ncr_cr_nrcr): assemble from already-computed,
+# single-root results dirs -- no TI methods are rerun. CytoTRACE itself is
+# root-independent (run_cytotrace() never receives start_cell), so its score
+# is identical across all source runs -- taken from the first one listed.
+multi_root_dirs <- switch(root_mode,
+  ncr_cr      = c(NCR = "linear_gse131847_d0centroid", CR = "linear_gse131847_cytoglobal"),
+  ncr_cr_nrcr = c(NCR = "linear_gse131847_d0centroid", CR = "linear_gse131847_cytoglobal",
+                  NRCR = "linear_gse131847_cytonaive"),
+  NULL)
+
+if (!is.null(multi_root_dirs)) {
+  root_csvs <- lapply(multi_root_dirs, function(d) {
+    p <- file.path(repo_root, "manuscript", "results", d, "ti_pseudotime_gse131847.csv")
+    if (!file.exists(p))
+      stop("Missing ti_pseudotime_gse131847.csv in ", d, " -- run run_ti_gse131847.R first.")
+    read.csv(p, row.names = 1, check.names = FALSE)
+  })
+  for (csv in root_csvs[-1]) stopifnot(identical(rownames(csv), rownames(root_csvs[[1]])))
+
+  directed_parts <- Map(function(csv, suffix) {
+    part <- csv[, intersect(colnames(csv), directed_8), drop = FALSE]
+    colnames(part) <- paste0(colnames(part), "_", suffix)
+    part
+  }, root_csvs, names(multi_root_dirs))
+
+  # unname() on directed_parts is essential: cbind()-ing a NAMED data.frame
+  # argument prefixes every one of its columns with that name (e.g.
+  # "NCR.Slingshot_NCR") -- it only names the column directly for a plain
+  # vector argument, which is why the CytoTRACE element below stays named.
+  ti_df <- do.call(cbind, c(unname(directed_parts), list(CytoTRACE = root_csvs[[1]][["CytoTRACE"]])))
+  rownames(ti_df) <- rownames(root_csvs[[1]])
+
+  csv_path <- file.path(results_dir, "ti_pseudotime_gse131847.csv")
+  write.csv(ti_df, csv_path, row.names = TRUE)
+  message("  Saved combined ", paste(names(multi_root_dirs), collapse = "/"), " pseudotimes: ", csv_path)
+
+  root_cells <- vapply(multi_root_dirs, function(d)
+    readLines(file.path(repo_root, "manuscript", "results", d, "root_cell_gse131847.txt"), n = 1),
+    character(1))
+  roots_out <- file.path(results_dir, "root_cells_gse131847.csv")
+  write.csv(data.frame(root_type = names(multi_root_dirs), cell = unname(root_cells)),
+            roots_out, row.names = FALSE)
+  message("  Saved: ", roots_out)
+} else {
+  csv_path <- file.path(results_dir, "ti_pseudotime_gse131847.csv")
+  if (!file.exists(csv_path))
+    stop("ti_pseudotime_gse131847.csv not found. Run run_ti_gse131847.R first.")
+  ti_df <- read.csv(csv_path, row.names = 1, check.names = FALSE)
+}
+
+if (root_mode == "dualcyto") {
+  # 7 directed methods x 2 roots ("_cytonaive"/"_cytoglobal" suffixes) + 1
+  # root-independent CytoTRACE column.
+  allowed_cols <- c("CytoTRACE",
+                    paste0(directed_8, "_cytonaive"),
+                    paste0(directed_8, "_cytoglobal"))
+  ti_df <- ti_df[, colnames(ti_df) %in% allowed_cols, drop = FALSE]
+} else if (!is.null(multi_root_dirs)) {
+  # ti_df was already assembled with exactly the right columns above.
+} else {
+  ti_df <- ti_df[, colnames(ti_df) %in% ti_methods_8, drop = FALSE]
+}
 message(sprintf("  Pseudotimes: %d cells x %d methods", nrow(ti_df), ncol(ti_df)))
 
 # ── Marker genes (MSigDB, mouse LCMV: naive vs. day8 LCMV effector) ─────────
@@ -168,17 +285,108 @@ tryCatch({
   method_order <- .doe_order(res, colnames(ti_df))
   shared <- intersect(rownames(umap_df), rownames(ti_df))
 
-  # Root cell: identical across all methods — the most-primitive cell by
-  # CytoTRACE score *restricted to naive cells* (see run_ti_gse131847.R),
-  # passed as start_cell to every TI method. The "CytoTRACE" column of ti_df
-  # *is* that same raw score (run_all_ti_methods() dispatches it straight to
-  # run_cytotrace()), so the root cell can be read off it directly rather
-  # than recomputed.
-  naive_cells <- intersect(shared, colnames(obj)[obj$cell_type == "naive"])
-  root_cell <- if ("CytoTRACE" %in% colnames(ti_df) && length(naive_cells) > 0)
-    naive_cells[which.min(ti_df[naive_cells, "CytoTRACE"])] else NA_character_
-  root_coord <- if (!is.na(root_cell))
-    umap_df[root_cell, c("UMAP1", "UMAP2")] else NULL
+  if (root_mode == "dualcyto") {
+    # Two exact roots, one per directed-method run -- read both back rather
+    # than approximating either.
+    roots_df        <- read.csv(file.path(results_dir, "root_cells_gse131847.csv"),
+                                stringsAsFactors = FALSE)
+    root_cytonaive  <- roots_df$cell[roots_df$root_type == "cytonaive"]
+    root_cytoglobal <- roots_df$cell[roots_df$root_type == "cytoglobal"]
+    coord_cytonaive  <- if (root_cytonaive  %in% rownames(umap_df))
+      umap_df[root_cytonaive,  c("UMAP1", "UMAP2")] else NULL
+    coord_cytoglobal <- if (root_cytoglobal %in% rownames(umap_df))
+      umap_df[root_cytoglobal, c("UMAP1", "UMAP2")] else NULL
+    # Root marker per column: suffix says which root was actually used;
+    # the single CytoTRACE column gets its own (global) root, since that IS
+    # the cell it naturally ranks lowest.
+    root_coord_for <- function(m) {
+      if (grepl("_cytonaive$",  m)) coord_cytonaive
+      else if (grepl("_cytoglobal$", m)) coord_cytoglobal
+      else if (m == "CytoTRACE") coord_cytoglobal
+      else NULL
+    }
+    # Prettify facet titles: "Slingshot_cytonaive" -> "Slingshot [naive-root]"
+    display_title <- function(m) {
+      m <- sub("_cytonaive$",  " [naive-root]",  m)
+      m <- sub("_cytoglobal$", " [global-root]", m)
+      m
+    }
+    root_color_for <- function(m) "black"
+    ncol_a <- 4
+  } else if (!is.null(multi_root_dirs)) {
+    # Multi-root modes (ncr_cr, ncr_cr_nrcr): one exact root cell per
+    # directed-method run, read back verbatim rather than approximated. The
+    # single CytoTRACE column always gets CR, since that IS the cell it
+    # naturally ranks lowest genome-wide.
+    root_types  <- names(multi_root_dirs)
+    root_label_map <- c(NCR = NCR_LABEL, CR = CR_LABEL, NRCR = NRCR_LABEL)[root_types]
+    root_color_map <- c(NCR = NCR_COLOR, CR = CR_COLOR, NRCR = NRCR_COLOR)[root_types]
+
+    roots_df    <- read.csv(file.path(results_dir, "root_cells_gse131847.csv"),
+                            stringsAsFactors = FALSE)
+    root_coords <- setNames(lapply(root_types, function(rt) {
+      cell <- roots_df$cell[roots_df$root_type == rt]
+      if (length(cell) == 1 && cell %in% rownames(umap_df))
+        umap_df[cell, c("UMAP1", "UMAP2")] else NULL
+    }), root_types)
+
+    # Which root type does column m belong to? ("CytoTRACE" always -> CR)
+    root_type_of <- function(m) {
+      if (m == "CytoTRACE") return("CR")
+      hit <- root_types[vapply(root_types, function(rt) grepl(paste0("_", rt, "$"), m), logical(1))]
+      if (length(hit) == 1) hit else NA_character_
+    }
+    root_coord_for <- function(m) { rt <- root_type_of(m); if (is.na(rt)) NULL else root_coords[[rt]] }
+    root_color_for <- function(m) { rt <- root_type_of(m); if (is.na(rt)) "black" else root_color_map[[rt]] }
+    root_label_for <- function(m) { rt <- root_type_of(m); if (is.na(rt)) NA_character_ else root_label_map[[rt]] }
+    # Prettify facet titles: "Slingshot_NCR" -> "Slingshot [NCR]"
+    display_title <- function(m) {
+      if (m == "CytoTRACE") return("CytoTRACE [CR]")
+      for (rt in root_types) m <- sub(paste0("_", rt, "$"), paste0(" [", rt, "]"), m)
+      m
+    }
+    # 2 roots -> 16 tiles (GT + 14 + CytoTRACE) at ncol=4 -> 4 rows.
+    # 3 roots -> 23 tiles (GT + 21 + CytoTRACE) at ncol=6 -> 4 rows too,
+    # keeping the same row count (and downstream assembled-figure height)
+    # regardless of how many roots are being compared.
+    ncol_a <- if (length(root_types) >= 3) 6 else 4
+  } else {
+    # Root cell for the 7 directed methods: the start_cell used by
+    # run_ti_gse131847.R (see root_mode above), persisted to
+    # root_cell_gse131847.txt since it can no longer be read off any one
+    # method's pseudotime column.
+    root_cell_path <- file.path(results_dir, "root_cell_gse131847.txt")
+    root_cell <- if (file.exists(root_cell_path))
+      readLines(root_cell_path, n = 1) else NA_character_
+    root_cell <- if (!is.na(root_cell) && root_cell %in% rownames(umap_df))
+      root_cell else NA_character_
+    root_coord <- if (!is.na(root_cell))
+      umap_df[root_cell, c("UMAP1", "UMAP2")] else NULL
+
+    # CytoTRACE is unsupervised -- run_cytotrace() never receives start_cell --
+    # so which cell to mark as "its root" is a separate choice (see cyto_marker
+    # above), not necessarily root_cell.
+    cytotrace_root_coord <- if ("CytoTRACE" %in% colnames(ti_df)) {
+      cyto_root <- switch(cyto_marker,
+        global_cyto_min = shared[which.min(ti_df[shared, "CytoTRACE"])],
+        naive_cyto_min  = {
+          naive_shared <- intersect(shared, colnames(obj)[obj$cell_type == "naive"])
+          naive_shared[which.min(ti_df[naive_shared, "CytoTRACE"])]
+        },
+        same_as_start_cell = root_cell
+      )
+      if (!is.na(cyto_root)) umap_df[cyto_root, c("UMAP1", "UMAP2")] else NULL
+    } else NULL
+
+    root_coord_for  <- function(m) if (m == "CytoTRACE") cytotrace_root_coord else root_coord
+    root_color_for  <- function(m) "black"
+    root_label_for  <- function(m) NA_character_
+    display_title   <- function(m) m
+    ncol_a <- 3
+  }
+
+  use_root_legend  <- !is.null(multi_root_dirs)
+  root_fill_values <- if (use_root_legend) setNames(root_color_map, root_label_map) else NULL
 
   method_plots <- lapply(method_order, function(m) {
     doe_val <- if (!is.null(res))
@@ -188,17 +396,40 @@ tryCatch({
       data.frame(UMAP1      = umap_df[shared, "UMAP1"],
                  UMAP2      = umap_df[shared, "UMAP2"],
                  Pseudotime = ti_df[shared, m]),
-      title = m
+      title = display_title(m)
     )
-    if (!is.null(root_coord))
-      p <- p + geom_point(data = root_coord, aes(x = UMAP1, y = UMAP2),
-                          colour = "black", shape = 17, size = 4, inherit.aes = FALSE)
+    if (use_root_legend) {
+      # Every panel gets a row for EACH root type (one real geom_point per
+      # level), so every panel's built-in legend already has all keys with
+      # correct fill colours -- the inactive roots are just drawn fully
+      # transparent. (A phantom break via scale `limits` alone leaves an
+      # empty glyph for a level absent from a panel's own data -- ggplot
+      # needs a real row.)
+      root_pts <- do.call(rbind, lapply(root_types, function(rt) {
+        if (is.null(root_coords[[rt]])) return(NULL)
+        data.frame(root_coords[[rt]], Root = root_label_map[[rt]])
+      }))
+      root_pts$Active <- root_pts$Root == root_label_for(m)
+      p <- p + geom_point(data = root_pts,
+                          aes(x = UMAP1, y = UMAP2, fill = Root, alpha = Active),
+                          colour = "black", shape = 24, size = 4, stroke = 0.6,
+                          inherit.aes = FALSE) +
+        scale_fill_manual(name = "Root", values = root_fill_values,
+                          guide = guide_legend(override.aes = list(alpha = 1))) +
+        scale_alpha_manual(values = c(`TRUE` = 1, `FALSE` = 0), guide = "none")
+    } else {
+      m_root_coord <- root_coord_for(m)
+      if (!is.null(m_root_coord))
+        p <- p + geom_point(data = m_root_coord, aes(x = UMAP1, y = UMAP2),
+                            colour = root_color_for(m), shape = 17, size = 4,
+                            inherit.aes = FALSE)
+    }
     p + labs(subtitle = if (!is.na(doe_val) && length(doe_val) == 1)
                sprintf("DOE = %.3f", doe_val) else NULL) +
       theme(plot.subtitle = element_text(size = SUB_A, colour = "grey40"))
   })
 
-  save_umap_grid(p_gt, method_plots, ncol = 3,
+  save_umap_grid(p_gt, method_plots, ncol = ncol_a,
                  out_path = file.path(out_dir, "S8_a_umap.pdf"), width = 14)
   message("  Saved S8_a_umap.pdf")
 }, error = function(e) message("  SKIPPED a: ", e$message))
@@ -228,11 +459,14 @@ tryCatch({
   trend_long$Module <- factor(trend_long$Module, levels = c("Early", "Terminal"))
   trend_long$Method <- factor(trend_long$Method, levels = .doe_order(res, colnames(ti_df)))
 
+  # ncr_cr has 15 method-root columns -- 3x5 (5 cols) rather than the default 4-wide wrap.
+  ncol_b <- if (root_mode == "ncr_cr") 5 else 4
+
   p_b <- ggplot(trend_long, aes(x = Pseudotime, y = Score, colour = Module)) +
     geom_point(size = 0.2, alpha = 0.15) +
     geom_smooth(method = "loess", se = TRUE, linewidth = 0.9, span = 0.4) +
     scale_colour_manual(values = c(Early = "#4E9AF1", Terminal = "#2D7A3E")) +
-    facet_wrap(~ Method, ncol = 4, scales = "free_x", axes = "all") +
+    facet_wrap(~ Method, ncol = ncol_b, scales = "free_x", axes = "all") +
     theme_minimal(base_size = 11.63) +
     theme(legend.position = "bottom",
           strip.text = element_text(face = "bold", size = 12.64),
@@ -241,7 +475,7 @@ tryCatch({
 
   n_m <- length(unique(trend_long$Method))
   ggsave(file.path(out_dir, "S8_b_module_trends.pdf"), p_b,
-         width = 14, height = ceiling(n_m / 4) * 3 + 1)
+         width = ncol_b * 3.5, height = ceiling(n_m / ncol_b) * 3 + 1)
   message("  Saved S8_b_module_trends.pdf")
 }, error = function(e) message("  SKIPPED b: ", e$message))
 
@@ -430,6 +664,9 @@ tryCatch({
   day_long$Method    <- factor(day_long$Method,    levels = method_order)
   rho_labels$Method  <- factor(rho_labels$Method,  levels = method_order)
 
+  # ncr_cr has 15 method-root columns -- 3x5 (5 cols) rather than the default 3-wide wrap.
+  ncol_e <- if (root_mode == "ncr_cr") 5 else 3
+
   p_e <- ggplot(day_long, aes(x = Day, y = Pseudotime)) +
     geom_violin(aes(fill = Day), scale = "width", colour = NA, alpha = 0.6, trim = TRUE) +
     geom_boxplot(width = 0.15, outlier.size = 0.4, outlier.alpha = 0.3,
@@ -437,7 +674,7 @@ tryCatch({
     geom_text(data = rho_labels, aes(label = label), x = -Inf, y = Inf,
               hjust = -0.025, vjust = 1.1, size = 3.4, colour = "grey20",
               inherit.aes = FALSE) +
-    facet_wrap(~ Method, ncol = 3, axes = "all") +
+    facet_wrap(~ Method, ncol = ncol_e, axes = "all") +
     scale_fill_hue(guide = "none") +
     theme_classic(base_size = 11.63) +
     theme(strip.text = element_text(face = "bold", size = 12.64),
@@ -447,7 +684,7 @@ tryCatch({
 
   n_m <- length(levels(day_long$Method))
   ggsave(file.path(out_dir, "S8_e_pseudotime_vs_day.pdf"), p_e,
-         width = 10.5, height = ceiling(n_m / 3) * 3.2 + 1)
+         width = ncol_e * 3.5, height = ceiling(n_m / ncol_e) * 3.2 + 1)
   message("  Saved S8_e_pseudotime_vs_day.pdf")
 }, error = function(e) message("  SKIPPED e: ", e$message))
 
