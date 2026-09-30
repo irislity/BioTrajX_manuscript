@@ -58,15 +58,16 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
 
 # NCR = Naive_Centroid_Root, CR = CytoTRACE_Root -- the two roots compared.
-# Shared colours/labels so panel a's root markers and panel d's shape legend
-# stay in sync. CytoTRACE itself is root-independent (run_cytotrace() never
-# receives start_cell), so it gets its own label/shape rather than either.
-NCR_LABEL  <- "NCR (Naive_Centroid_Root)"
-CR_LABEL   <- "CR (CytoTRACE_Root)"
-CYTO_LABEL <- "CytoTRACE (root-independent)"
-NCR_COLOR  <- "blue"
-CR_COLOR   <- "red"
-ROOT_DIRS  <- c(NCR = "linear_gse131847_d0centroid", CR = "linear_gse131847_cytoglobal")
+# Shared colours/labels/shapes so panel a's root markers and panel d's shape
+# legend stay in sync. CytoTRACE itself is root-independent (run_cytotrace()
+# never receives start_cell) and is folded into CR for labelling purposes,
+# since CR IS the cell it naturally ranks lowest genome-wide -- diamond marks
+# that combined CR/CytoTRACE category, triangle marks NCR.
+NCR_LABEL <- "NCR (Naive_Centroid_Root)"
+CR_LABEL  <- "CR (CytoTRACE_Root)"
+NCR_COLOR <- "blue"
+CR_COLOR  <- "red"
+ROOT_DIRS <- c(NCR = "linear_gse131847_d0centroid", CR = "linear_gse131847_cytoglobal")
 
 BASE_A <- 11.63; HEAD_A <- 12.64; SUB_A <- 10.11
 
@@ -225,10 +226,13 @@ tryCatch({
   shared <- intersect(rownames(umap_df), rownames(ti_df))
 
   # Two exact roots, one per directed-method run -- read back verbatim rather
-  # than approximated. The single CytoTRACE column always gets CR, since
-  # that IS the cell it naturally ranks lowest genome-wide.
+  # than approximated. The single CytoTRACE column is folded into CR (that
+  # IS the cell it naturally ranks lowest genome-wide), so it shares CR's
+  # colour/label -- diamond marks CR/CytoTRACE, triangle marks NCR.
+  root_types_a   <- c("NCR", "CR")
   root_label_map <- c(NCR = NCR_LABEL, CR = CR_LABEL)
   root_color_map <- c(NCR = NCR_COLOR, CR = CR_COLOR)
+  root_shape_map <- c(NCR = 24, CR = 23)  # triangle / diamond
 
   roots_df    <- read.csv(file.path(results_dir, "root_cells_gse131847.csv"),
                           stringsAsFactors = FALSE)
@@ -238,7 +242,7 @@ tryCatch({
       umap_df[cell, c("UMAP1", "UMAP2")] else NULL
   }), names(ROOT_DIRS))
 
-  # Which root type does column m belong to? ("CytoTRACE" always -> CR)
+  # Which root type does column m belong to? ("CytoTRACE" -> CR)
   root_type_of <- function(m) {
     if (m == "CytoTRACE") return("CR")
     if (grepl("_NCR$", m)) return("NCR")
@@ -254,7 +258,8 @@ tryCatch({
     m
   }
   ncol_a <- 4
-  root_fill_values <- setNames(root_color_map, root_label_map)
+  root_fill_values  <- setNames(root_color_map, root_label_map)
+  root_shape_values <- setNames(root_shape_map, root_label_map)
 
   method_plots <- lapply(method_order, function(m) {
     doe_val <- if (!is.null(res))
@@ -267,22 +272,28 @@ tryCatch({
       title = display_title(m)
     )
     # Every panel gets a row for EACH root type (one real geom_point per
-    # level), so every panel's built-in legend already has both keys with
-    # correct fill colours -- the inactive root is just drawn fully
-    # transparent. (A phantom break via scale `limits` alone leaves an
-    # empty glyph for a level absent from a panel's own data -- ggplot
+    # level), so every panel's built-in legend already has all keys with
+    # correct fill colours/shapes -- the inactive roots are just drawn
+    # fully transparent. (A phantom break via scale `limits` alone leaves
+    # an empty glyph for a level absent from a panel's own data -- ggplot
     # needs a real row.)
-    root_pts <- do.call(rbind, lapply(names(ROOT_DIRS), function(rt) {
+    root_pts <- do.call(rbind, lapply(root_types_a, function(rt) {
       if (is.null(root_coords[[rt]])) return(NULL)
       data.frame(root_coords[[rt]], Root = root_label_map[[rt]])
     }))
     root_pts$Active <- root_pts$Root == root_label_for(m)
     p <- p + geom_point(data = root_pts,
-                        aes(x = UMAP1, y = UMAP2, fill = Root, alpha = Active),
-                        colour = "black", shape = 24, size = 4, stroke = 0.6,
+                        aes(x = UMAP1, y = UMAP2, fill = Root, shape = Root, alpha = Active),
+                        colour = "black", size = 4, stroke = 0.6,
                         inherit.aes = FALSE) +
       scale_fill_manual(name = "Root", values = root_fill_values,
-                        guide = guide_legend(override.aes = list(alpha = 1))) +
+                        guide = guide_legend(override.aes = list(alpha = 1),
+                                              title.theme = element_text(size = 11),
+                                              label.theme = element_text(size = 9))) +
+      scale_shape_manual(name = "Root", values = root_shape_values,
+                         guide = guide_legend(override.aes = list(alpha = 1),
+                                               title.theme = element_text(size = 11),
+                                               label.theme = element_text(size = 9))) +
       scale_alpha_manual(values = c(`TRUE` = 1, `FALSE` = 0), guide = "none")
     p + labs(subtitle = if (!is.na(doe_val) && length(doe_val) == 1)
                sprintf("DOE = %.3f", doe_val) else NULL) +
@@ -411,11 +422,10 @@ tryCatch({
 
   # Root type per method, for panel d's shape legend (explains what NCR/CR
   # mean directly in the plot rather than relying on the facet titles alone).
-  day_corr$RootType <- ifelse(grepl("_NCR$", day_corr$Method), NCR_LABEL,
-                        ifelse(grepl("_CR$",  day_corr$Method), CR_LABEL,
-                               CYTO_LABEL))
-  day_corr$RootType <- factor(day_corr$RootType,
-                              levels = c(NCR_LABEL, CR_LABEL, CYTO_LABEL))
+  # CytoTRACE is folded into CR (that IS the cell it naturally ranks lowest
+  # genome-wide), so it shares CR's diamond shape rather than getting its own.
+  day_corr$RootType <- ifelse(grepl("_NCR$", day_corr$Method), NCR_LABEL, CR_LABEL)
+  day_corr$RootType <- factor(day_corr$RootType, levels = c(NCR_LABEL, CR_LABEL))
 
   message("\nPer-method: pseudotime vs. true day-of-infection correlation, and DOE score")
   print(day_corr[, c("Method", "DOE_score", "spearman_rho", "spearman_p")])
@@ -453,7 +463,7 @@ tryCatch({
       showtext::showtext_opts(dpi = 300)
     }
 
-    root_shape_values <- setNames(c(17, 16, 18), c(NCR_LABEL, CR_LABEL, CYTO_LABEL))
+    root_shape_values <- setNames(c(17, 18), c(NCR_LABEL, CR_LABEL))  # triangle / diamond
 
     p_d <- ggplot(day_corr, aes(x = DOE_score, y = spearman_rho)) +
       geom_smooth(method = "lm", se = TRUE, colour = "#AAAAAA",
@@ -463,7 +473,10 @@ tryCatch({
                       box.padding = 0.5, point.padding = 0.3, force = 3,
                       family = "Arial") +
       scale_colour_viridis_c(name = "DOE score", option = "plasma", direction = -1) +
-      scale_shape_manual(name = "Root", values = root_shape_values) +
+      scale_shape_manual(name = "Root", values = root_shape_values,
+                         guide = guide_legend(
+                           title.theme = element_text(size = 13, family = "Arial"),
+                           label.theme = element_text(size = 11, family = "Arial"))) +
       annotate("text", x = ann_x, y = max(day_corr$spearman_rho) * 0.98,
                size = 5, colour = "grey30", family = "Arial",
                label = sprintf("r = %.2f (%s)",

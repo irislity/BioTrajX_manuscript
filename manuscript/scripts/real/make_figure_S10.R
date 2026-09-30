@@ -336,13 +336,32 @@ tryCatch({
 }, error = function(e) message("  SKIPPED S10-c: ", e$message))
 
 # ── Panel b: BioTrajX DOE heatmap (branch scope + overall DOE column) ─────────
+# Style/font size matching S8 panel c.
 message("\n[S10-b] DOE heatmap (BioTrajX, branch scope)")
 tryCatch({
   if (is.null(res_s10)) stop("res_s10 is NULL")
+  if (requireNamespace("showtext", quietly = TRUE) && requireNamespace("sysfonts", quietly = TRUE)) {
+    sysfonts::font_add("Arial",
+      regular    = file.path(repo_root, "manuscript", "fonts", "Arial.ttf"),
+      bold       = file.path(repo_root, "manuscript", "fonts", "Arial Bold.ttf"),
+      italic     = file.path(repo_root, "manuscript", "fonts", "Arial Italic.ttf"),
+      bolditalic = file.path(repo_root, "manuscript", "fonts", "Arial Bold Italic.ttf"))
+    showtext::showtext_auto()
+    showtext::showtext_opts(dpi = 300)
+  }
   p_b10 <- plot(res_s10, scope = "branch", type = "heatmap", branch_mode = "facet") +
     labs(title = NULL) +
-    theme(panel.grid = element_blank())
-  ggsave(file.path(out_S10, "S10_b_doe_heatmap.pdf"), p_b10, width = 11, height = 7)
+    theme(panel.grid = element_blank(),
+          text         = element_text(family = "Arial"),
+          axis.text    = element_text(size = 15, family = "Arial"),
+          axis.title   = element_text(size = 16, family = "Arial"),
+          legend.text  = element_text(size = 14, family = "Arial"),
+          legend.title = element_text(size = 15, family = "Arial"),
+          strip.text   = element_text(size = 15, family = "Arial", face = "bold"))
+  p_b10$layers[[2]]$aes_params$size <- 5.1
+  p_b10$layers[[2]]$aes_params$family <- "Arial"
+  ggsave(file.path(out_S10, "S10_b_doe_heatmap.pdf"), p_b10, width = 11.5, height = 7.5, dpi = 300)
+  if (requireNamespace("showtext", quietly = TRUE)) showtext::showtext_auto(FALSE)
   message("  Saved S10_b_doe_heatmap.pdf")
 }, error = function(e) message("  SKIPPED S10-b: ", e$message))
 
