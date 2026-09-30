@@ -20,15 +20,11 @@
 #   data/cd8t.rds
 #   manuscript/results/linear_cd8t/ti_pseudotime_cd8t.csv  (from run_ti_cd8t.R)
 #
+# Marker genes: SlimR::Markers_list_PCTIT "CD8+ Tn" (early) / "CD8+ GZMK+ Tex"
+# (terminal), top_n = NULL (no truncation).
+#
 # Usage:
-#   Rscript manuscript/scripts/real/make_figure_S9.R [marker_mode]
-#     marker_mode  msigdb (default) | slimr_pctit
-#                  -- msigdb: KAECH_NAIVE_VS_DAY8_EFF_CD8_TCELL_UP (early) /
-#                     JIANG_MELANOMA_TRM2_CD8 (terminal), top_n = 30
-#                  -- slimr_pctit: SlimR::Markers_list_PCTIT "CD8+ Tn" (early) /
-#                     "CD8+ GZMK+ Tex" (terminal), top_n = NULL (no truncation)
-#                  Output goes to figures/real/S9 (msigdb) or
-#                  figures/real/S9_slimr_pctit.
+#   Rscript manuscript/scripts/real/make_figure_S9.R
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -44,13 +40,7 @@ library(BioTrajX)
 has_patchwork <- requireNamespace("patchwork", quietly = TRUE)
 if (has_patchwork) library(patchwork)
 
-args        <- commandArgs(trailingOnly = TRUE)
-marker_mode <- if (length(args) >= 1) args[1] else "msigdb"
-stopifnot(marker_mode %in% c("msigdb", "slimr_pctit"))
-message("marker_mode = ", marker_mode)
-
-out_S9 <- file.path(repo_root, "manuscript", "figures", "real",
-                    if (marker_mode == "msigdb") "S9" else paste0("S9_", marker_mode))
+out_S9 <- file.path(repo_root, "manuscript", "figures", "real", "S9")
 dir.create(out_S9, recursive = TRUE, showWarnings = FALSE)
 
 # =============================================================================
@@ -134,32 +124,16 @@ if (!file.exists(csv_s9))
 ti_df_s9 <- read.csv(csv_s9, row.names = 1, check.names = FALSE)
 message(sprintf("  Pseudotimes: %d cells × %d methods", nrow(ti_df_s9), ncol(ti_df_s9)))
 
-# ── Marker genes ──────────────────────────────────────────────────────────────
-if (marker_mode == "msigdb") {
-  # Naive pole:    KAECH_NAIVE_VS_DAY8_EFF_CD8_TCELL_UP (C7)
-  #   Curated Kaech naive vs day-8 effector signature; yields highest DOE
-  #   scores (top DOE 0.689) and strongest D_early recovery (0.62-0.68).
-  # Terminal pole: JIANG_MELANOMA_TRM2_CD8 (C2)
-  message("  Fetching MSigDB markers for S9 ...")
-  ms_s9 <- get_markers_msigdb(
-    early      = "KAECH_NAIVE_VS_DAY8_EFF_CD8_TCELL_UP",
-    terminal   = "JIANG_MELANOMA_TRM2_CD8",
-    collection = NULL,
-    species    = "Homo sapiens"
-  )
-  ms_s9 <- filter_markers(ms_s9, obj_s9, top_n = 30, min_detection = 0.10)
-} else {
-  # SlimR curated pan-cancer T-cell (PCTIT) atlas signatures.
-  message("  Fetching SlimR PCTIT markers for S9 ...")
-  pctit_s9 <- SlimR::Markers_list_PCTIT
-  ms_s9 <- BioTrajX:::.marker_set(
-    early    = pctit_s9[["CD8+ Tn"]]$Markers,
-    terminal = pctit_s9[["CD8+ GZMK+ Tex"]]$Markers,
-    source   = "SlimR_PCTIT",
-    metadata = list(early_set = "CD8+ Tn", terminal_set = "CD8+ GZMK+ Tex")
-  )
-  ms_s9 <- filter_markers(ms_s9, obj_s9, top_n = NULL, min_detection = 0.10)
-}
+# ── Marker genes: SlimR curated pan-cancer T-cell (PCTIT) atlas signatures ──
+message("  Fetching SlimR PCTIT markers for S9 ...")
+pctit_s9 <- SlimR::Markers_list_PCTIT
+ms_s9 <- BioTrajX:::.marker_set(
+  early    = pctit_s9[["CD8+ Tn"]]$Markers,
+  terminal = pctit_s9[["CD8+ GZMK+ Tex"]]$Markers,
+  source   = "SlimR_PCTIT",
+  metadata = list(early_set = "CD8+ Tn", terminal_set = "CD8+ GZMK+ Tex")
+)
+ms_s9 <- filter_markers(ms_s9, obj_s9, top_n = NULL, min_detection = 0.10)
 early_genes_s9 <- ms_s9$early
 term_genes_s9  <- ms_s9$terminal
 message(sprintf("  early markers: %d, terminal markers: %d",
@@ -185,8 +159,7 @@ res_s9 <- tryCatch(
 if (!is.null(res_s9))
   write.csv(res_s9$comparison_summary,
             file.path(repo_root, "manuscript", "results", "linear_cd8t",
-                      if (marker_mode == "msigdb") "doe_scores_cd8t.csv"
-                      else sprintf("doe_scores_cd8t_%s.csv", marker_mode)),
+                      "doe_scores_cd8t.csv"),
             row.names = FALSE)
 
 # ── Panel a: UMAP grid ────────────────────────────────────────────────────────
