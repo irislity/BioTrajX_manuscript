@@ -63,8 +63,8 @@ dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
 # never receives start_cell) and is folded into CR for labelling purposes,
 # since CR IS the cell it naturally ranks lowest genome-wide -- diamond marks
 # that combined CR/CytoTRACE category, triangle marks NCR.
-NCR_LABEL <- "NCR (Naive_Centroid_Root)"
-CR_LABEL  <- "CR (CytoTRACE_Root)"
+NCR_LABEL <- "Naive-centroid root (NCR)"
+CR_LABEL  <- "CytoTRACE root (CR)"
 NCR_COLOR <- "blue"
 CR_COLOR  <- "red"
 ROOT_DIRS <- c(NCR = "linear_gse131847_d0centroid", CR = "linear_gse131847_cytoglobal")
@@ -426,6 +426,9 @@ tryCatch({
   # genome-wide), so it shares CR's diamond shape rather than getting its own.
   day_corr$RootType <- ifelse(grepl("_NCR$", day_corr$Method), NCR_LABEL, CR_LABEL)
   day_corr$RootType <- factor(day_corr$RootType, levels = c(NCR_LABEL, CR_LABEL))
+  # Point labels drop the "_NCR"/"_CR" suffix -- shape already encodes root
+  # type, so the label just needs the method name (CytoTRACE has no suffix).
+  day_corr$MethodLabel <- sub("_(NCR|CR)$", "", day_corr$Method)
 
   message("\nPer-method: pseudotime vs. true day-of-infection correlation, and DOE score")
   print(day_corr[, c("Method", "DOE_score", "spearman_rho", "spearman_p")])
@@ -469,7 +472,7 @@ tryCatch({
       geom_smooth(method = "lm", se = TRUE, colour = "#AAAAAA",
                  fill = "#DDDDDD", linewidth = 0.8) +
       geom_point(aes(colour = DOE_score, shape = RootType), size = 5) +
-      geom_text_repel(aes(label = Method), size = 4.3, max.overlaps = 20,
+      geom_text_repel(aes(label = MethodLabel), size = 4.3, max.overlaps = 20,
                       box.padding = 0.5, point.padding = 0.3, force = 3,
                       family = "Arial") +
       scale_colour_viridis_c(name = "DOE score", option = "plasma", direction = -1) +
