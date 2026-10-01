@@ -115,7 +115,7 @@ python3 assemble_figure.py \
 python3 assemble_figure.py \
   --layout s8_layout.json \
   --no-titles \
-  --figure-title "Figure S8. BioTrajX DOE score tracks ground-truth recovery of infection timing (GSE131847)" \
+  --figure-title "Figure S8. BioTrajX DOE score ranking correlates with ground-truth infection timing recovery" \
   --out-dir "$SUPP_DIR" \
   --out FigureS8.pdf
 
