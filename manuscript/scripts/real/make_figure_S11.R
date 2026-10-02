@@ -11,7 +11,7 @@
 #   CD8.NaiveLike — root 1: same CytoTRACE selection as S8 (which.min on
 #                            inverted run_cytotrace() score across full dataset)
 #   CD8.NaiveLike — root 2: closest to PCA centroid of cluster
-#   CD8.CM / CD8.EM / CD8.TPEX / CD8.TEX — PCA centroid cell per cluster
+#   CD8.EM / CD8.TPEX / CD8.TEX — PCA centroid cell per cluster
 #
 # Panels:
 #   S11_a_umap.pdf        UMAP coloured by pseudotime for each candidate root
@@ -23,8 +23,9 @@
 # Prerequisites:
 #   data/cd8t.rds
 #
-# Marker genes: SlimR::Markers_list_PCTIT "CD8+ Tn" (early) / "CD8+ GZMK+ Tex"
-# (terminal), top_n = NULL (no truncation).
+# Marker genes: SlimR::Markers_list_PCTIT "CD8+ Tn" (early) / MSigDB
+# "GSE9650_EFFECTOR_VS_EXHAUSTED_CD8_TCELL_DN" (terminal), top_n = NULL
+# (no truncation).
 #
 # Usage:
 #   Rscript manuscript/scripts/real/make_figure_S11.R
@@ -61,13 +62,20 @@ hvg    <- VariableFeatures(seurat)
 expr_mat      <- as.matrix(GetAssayData(seurat, layer = "data")[hvg, ])
 fullgene_expr <- as.matrix(GetAssayData(seurat, layer = "data"))
 
-message("Fetching SlimR PCTIT markers for S11 ...")
+message("Fetching SlimR PCTIT early markers + MSigDB terminal markers for S11 ...")
 pctit_s11 <- SlimR::Markers_list_PCTIT
+msigdb_s11 <- get_markers_msigdb(
+  early      = "GSE9650_EFFECTOR_VS_EXHAUSTED_CD8_TCELL_DN",
+  terminal   = "GSE9650_EFFECTOR_VS_EXHAUSTED_CD8_TCELL_DN",
+  collection = NULL,
+  species    = "Homo sapiens"
+)
 ms <- BioTrajX:::.marker_set(
   early    = pctit_s11[["CD8+ Tn"]]$Markers,
-  terminal = pctit_s11[["CD8+ GZMK+ Tex"]]$Markers,
-  source   = "SlimR_PCTIT",
-  metadata = list(early_set = "CD8+ Tn", terminal_set = "CD8+ GZMK+ Tex")
+  terminal = msigdb_s11$terminal,
+  source   = "SlimR_PCTIT + MSigDB",
+  metadata = list(early_set = "CD8+ Tn",
+                  terminal_set = "GSE9650_EFFECTOR_VS_EXHAUSTED_CD8_TCELL_DN")
 )
 ms <- filter_markers(ms, seurat, top_n = NULL, min_detection = 0.10)
 naive_genes  <- ms$early
@@ -115,7 +123,6 @@ roots <- c(
   "NaiveLike (CytoTRACE)"     = nl_root1,
   "NaiveLike (centroid)"      = nl_root2,
   "NaiveLike (naive markers)" = nl_root3,
-  "CD8.CM"                    = centroid_cell("CD8.CM"),
   "CD8.EM"                    = centroid_cell("CD8.EM"),
   "CD8.TPEX"                  = centroid_cell("CD8.TPEX"),
   "CD8.TEX"                   = centroid_cell("CD8.TEX")
@@ -127,7 +134,7 @@ for (nm in names(roots)) message(sprintf("  %-30s %s", nm, roots[nm]))
 # Cluster colour palette — ggplot2's default hue scale, but ordered along the
 # naive-to-exhausted trajectory (NaiveLike first) rather than alphabetically,
 # matching S9 panel A's cell-type ordering.
-cluster_levels <- c("CD8.NaiveLike", "CD8.CM", "CD8.EM", "CD8.TPEX", "CD8.TEX")
+cluster_levels <- c("CD8.NaiveLike", "CD8.EM", "CD8.TPEX", "CD8.TEX")
 cluster_levels <- intersect(cluster_levels, unique(meta$functional.cluster))
 cluster_pal    <- setNames(scales::hue_pal()(length(cluster_levels)), cluster_levels)
 
@@ -136,7 +143,6 @@ root_cluster <- c(
   "NaiveLike (CytoTRACE)"     = "CD8.NaiveLike",
   "NaiveLike (centroid)"      = "CD8.NaiveLike",
   "NaiveLike (naive markers)" = "CD8.NaiveLike",
-  "CD8.CM"                    = "CD8.CM",
   "CD8.EM"                    = "CD8.EM",
   "CD8.TPEX"                  = "CD8.TPEX",
   "CD8.TEX"                   = "CD8.TEX"
