@@ -46,9 +46,12 @@ echo "Assembling supplementary figures ..."
 # S1 and S11 need explicit per-row heights (in s1_layout.json / s11_layout.json)
 # to fit without overflow; everything else fits at true A4 with its normal --cols.
 
-# S2 — UMAPs for all synthetic fixtures (4 cols)
+# S2 — UMAPs for all synthetic fixtures (linear incl. 16 shuffled; branched AB incl. 17 shuffled → 4 cols)
 python3 assemble_figure.py \
-  plots/[0-9][0-9]*_a_umap.pdf \
+  plots/0[1-9]_*_a_umap.pdf \
+  plots/16_*_a_umap.pdf \
+  plots/1[0-5]_*_a_umap.pdf \
+  plots/17_*_a_umap.pdf \
   --cols 4 \
   --figure-title "Figure S2. UMAP embeddings of synthetic trajectory fixtures" \
   --out-dir "$SUPP_DIR" \
@@ -87,7 +90,7 @@ python3 assemble_figure.py \
   plots/[0-9][0-9]*_d_O_metric.pdf \
   plots/[0-9][0-9]*_d_O_metric_AB.pdf \
   --cols 4 \
-  --figure-title "Figure S5. Ordering consistency (O) evaluation across synthetic fixtures" \
+  --figure-title "Figure S5. Order consistency (O) evaluation across synthetic fixtures" \
   --out-dir "$SUPP_DIR" \
   --out FigureS5.pdf
 

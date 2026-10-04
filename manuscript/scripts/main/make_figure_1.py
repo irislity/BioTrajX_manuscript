@@ -62,7 +62,7 @@ DOE_BOX_BORDER = "#f4c542"
 DOE_BOX_FILL   = "#fff2cc"
 DOE_BOX_TEXT   = "#000000"
 
-PANEL_B_TITLES  = ["Directionality (D)", "Ordering Consistency (O)", "Endpoint Validity (E)"]
+PANEL_B_TITLES  = ["Directionality (D)", "Order Consistency (O)", "Endpoint Validity (E)"]
 PANEL_B_CAPTIONS = [["Spearman", "correlation"], ["Monotonic", "Trend"], ["Precision@k"]]
 PANEL_B_NOTE = "DOE = mean(D$_{comp}$, O, E$_{comp}$)"
 
