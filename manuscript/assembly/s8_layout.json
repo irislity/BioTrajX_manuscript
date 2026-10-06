@@ -16,7 +16,6 @@
     {
       "row_height": 286,
       "panels": [
-        {"file": "../figures/real/S8/S8_d_day_corr_vs_doe.pdf"},
         {"file": "../figures/real/S8/S8_e_pseudotime_vs_day.pdf"}
       ]
     }

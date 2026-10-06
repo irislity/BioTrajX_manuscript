@@ -24,9 +24,6 @@
       "panels": [
         {
           "file": "../figures/real/S11/S11_d_radar.pdf"
-        },
-        {
-          "file": "../figures/real/S11/S11_e_doe_heatmap.pdf"
         }
       ]
     }

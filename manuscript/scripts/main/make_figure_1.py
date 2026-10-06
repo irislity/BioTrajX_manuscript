@@ -7,8 +7,8 @@ Assembles Figure 1 for the BioTrajX manuscript.
 Panels:
   A — BioTrajX workflow overview     (manuscript/figures/main/panel_A.svg)
   B — D / O / E metric schematic     (man/figures/DOE.jpg)
-  C — DOE score heatmap              (manuscript/figures/real/S11/S11_e_doe_heatmap.pdf)
-  D — Day-of-infection recovery vs DOE (manuscript/figures/real/S8/S8_d_day_corr_vs_doe.pdf)
+  C — Day-of-infection recovery vs DOE (manuscript/figures/real/S8/S8_d_day_corr_vs_doe.pdf)
+  D — DOE score heatmap              (manuscript/figures/real/S11/S11_e_doe_heatmap.pdf)
 
 Layout:
   Row 1: Panel A  (full width)
@@ -54,8 +54,8 @@ S11     = REPO / "manuscript" / "figures" / "real" / "S11"
 
 PANEL_A     = MAIN / "panel_A.pdf"
 DOE_JPG     = MAIN / "DOE.jpg"
-PANEL_C     = S11  / "S11_e_doe_heatmap.pdf"
-PANEL_D     = S8   / "S8_d_day_corr_vs_doe.pdf"
+PANEL_C     = S8   / "S8_d_day_corr_vs_doe.pdf"
+PANEL_D     = S11  / "S11_e_doe_heatmap.pdf"
 
 # ── Panel A amber "Composite DOE scores" box, reused for Panel B's box ──
 DOE_BOX_BORDER = "#f4c542"
@@ -66,10 +66,10 @@ PANEL_B_TITLES  = ["Directionality (D)", "Order Consistency (O)", "Endpoint Vali
 PANEL_B_CAPTIONS = [["Spearman", "correlation"], ["Monotonic", "Trend"], ["Precision@k"]]
 PANEL_B_NOTE = "DOE = mean(D$_{comp}$, O, E$_{comp}$)"
 
-PANEL_C_TITLE    = "BioTrajX provides a quantitative criterion for trajectory root selection"
-PANEL_C_SUBTITLE = "Monocle3 roots spanning major CD8+ T-cell states"
-PANEL_D_TITLE    = "Higher DOE scores correspond to better recovery of infection timing"
-PANEL_D_SUBTITLE = "Independent LCMV time-course validation (GSE131847)"
+PANEL_C_TITLE    = "Higher DOE scores correspond to better recovery of infection timing"
+PANEL_C_SUBTITLE = "Independent LCMV time-course validation (GSE131847)"
+PANEL_D_TITLE    = "BioTrajX provides a quantitative criterion for trajectory root selection"
+PANEL_D_SUBTITLE = "Monocle3 roots spanning major CD8+ T-cell states"
 
 # Unified panel-letter size (A–D identical) and Panel C/D narrative-title size
 # (kept at/under Panel B's metric-title size so no panel dominates the others).
@@ -96,8 +96,8 @@ def _check_panels() -> None:
     for path, label in [
         (PANEL_A, "A (workflow SVG)"),
         (DOE_JPG, "B (DOE schematic image)"),
-        (PANEL_C, "C (DOE heatmap)"),
-        (PANEL_D, "D (day-corr-vs-DOE)"),
+        (PANEL_C, "C (day-corr-vs-DOE)"),
+        (PANEL_D, "D (DOE heatmap)"),
     ]:
         if not path.exists():
             missing.append(f"  Panel {label}: {path}")
